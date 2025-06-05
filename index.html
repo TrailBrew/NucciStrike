@@ -49,18 +49,38 @@
     scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(200, 200),
-      new THREE.MeshStandardMaterial({ color: 0x666666 })
+      new THREE.PlaneGeometry(300, 300),
+      new THREE.MeshStandardMaterial({ color: 0x444444 })
     );
     ground.rotation.x = -Math.PI / 2;
     scene.add(ground);
 
-    const cat = new THREE.Mesh(
+    // Roads (grid style)
+    for (let i = -150; i <= 150; i += 20) {
+      const road = new THREE.Mesh(
+        new THREE.PlaneGeometry(300, 4),
+        new THREE.MeshStandardMaterial({ color: 0x222222 })
+      );
+      road.position.z = i;
+      road.rotation.x = -Math.PI / 2;
+      scene.add(road);
+
+      const road2 = new THREE.Mesh(
+        new THREE.PlaneGeometry(4, 300),
+        new THREE.MeshStandardMaterial({ color: 0x222222 })
+      );
+      road2.position.x = i;
+      road2.rotation.x = -Math.PI / 2;
+      scene.add(road2);
+    }
+
+    // Cat body
+    const body = new THREE.Mesh(
       new THREE.SphereGeometry(1, 32, 32),
       new THREE.MeshStandardMaterial({ color: 0xffcc99 })
     );
-    cat.position.y = 1;
-    scene.add(cat);
+    body.position.y = 1;
+    scene.add(body);
 
     const nameTag = document.createElement('div');
     nameTag.style.position = 'absolute';
@@ -73,34 +93,49 @@
 
     let weight = 1.0;
     let hp = 100;
+    let paused = false;
     const foodItems = [];
+    const cars = [];
 
+    // Cars
+    function spawnCar() {
+      const car = new THREE.Mesh(
+        new THREE.BoxGeometry(2, 1, 4),
+        new THREE.MeshStandardMaterial({ color: 0xff3333 })
+      );
+      car.position.set(-150, 0.5, (Math.random() - 0.5) * 280);
+      car.userData.speed = 0.5 + Math.random() * 0.3;
+      scene.add(car);
+      cars.push(car);
+    }
+    for (let i = 0; i < 5; i++) spawnCar();
+
+    // Buildings
     const buildingGeo = new THREE.BoxGeometry(10, 20, 10);
     for (let i = 0; i < 10; i++) {
       const bMat = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff });
       const b = new THREE.Mesh(buildingGeo, bMat);
-      b.position.set((Math.random() - 0.5) * 180, 10, (Math.random() - 0.5) * 180);
+      b.position.set((Math.random() - 0.5) * 280, 10, (Math.random() - 0.5) * 280);
       scene.add(b);
     }
 
     function spawnFood() {
       const types = [
         { geometry: new THREE.SphereGeometry(0.2), weight: 0.05, color: 0x996633 },
-        { geometry: new THREE.BoxGeometry(0.3, 0.3, 0.3), weight: 0.25, color: 0xdddddd },
-        { geometry: new THREE.BoxGeometry(0.4, 0.2, 0.6), weight: 1.0, color: 0x3366ff }
+        { geometry: new THREE.BoxGeometry(0.3, 0.3, 0.3), weight: 0.2, color: 0xdddddd },
+        { geometry: new THREE.BoxGeometry(0.4, 0.2, 0.6), weight: 0.5, color: 0x3366ff }
       ];
       const type = types[Math.floor(Math.random() * types.length)];
       const mat = new THREE.MeshStandardMaterial({ color: type.color });
       const food = new THREE.Mesh(type.geometry, mat);
       food.userData.weight = type.weight;
-      food.position.set((Math.random() - 0.5) * 180, 0.15, (Math.random() - 0.5) * 180);
+      food.position.set((Math.random() - 0.5) * 280, 0.15, (Math.random() - 0.5) * 280);
       scene.add(food);
       foodItems.push(food);
     }
     for (let i = 0; i < 30; i++) spawnFood();
 
     let move = { forward: false, backward: false, left: false, right: false, shift: false };
-    let paused = false;
 
     document.addEventListener("keydown", (e) => {
       if (e.key === "w") move.forward = true;
@@ -119,6 +154,7 @@
       if (e.key === "Shift") move.shift = false;
     });
 
+    let yaw = 0;
     let isPointerLocked = false;
     document.body.addEventListener("click", () => {
       if (!isPointerLocked) renderer.domElement.requestPointerLock();
@@ -126,10 +162,8 @@
     document.addEventListener("pointerlockchange", () => {
       isPointerLocked = document.pointerLockElement === renderer.domElement;
     });
-
-    let yaw = 0;
     document.addEventListener("mousemove", (e) => {
-      if (isPointerLocked && !paused) yaw += e.movementX * 0.002;
+      if (isPointerLocked && !paused) yaw -= e.movementX * 0.002;
     });
 
     function animate() {
@@ -140,29 +174,40 @@
       moveSpeed -= weight * 0.0025;
       moveSpeed = Math.max(0.05, moveSpeed);
 
-      const dir = new THREE.Vector3(Math.sin(yaw), 0, -Math.cos(yaw));
+      const dir = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
       const sideDir = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), dir);
 
-      if (move.forward) cat.position.add(dir.clone().multiplyScalar(moveSpeed));
-      if (move.backward) cat.position.add(dir.clone().multiplyScalar(-moveSpeed));
-      if (move.left) cat.position.add(sideDir.clone().multiplyScalar(moveSpeed));
-      if (move.right) cat.position.add(sideDir.clone().multiplyScalar(-moveSpeed));
+      if (move.forward) body.position.add(dir.clone().multiplyScalar(moveSpeed));
+      if (move.backward) body.position.add(dir.clone().multiplyScalar(-moveSpeed));
+      if (move.left) body.position.add(sideDir.clone().multiplyScalar(-moveSpeed));
+      if (move.right) body.position.add(sideDir.clone().multiplyScalar(moveSpeed));
 
-      camera.position.copy(cat.position.clone().add(new THREE.Vector3(0, 5, 8).applyAxisAngle(new THREE.Vector3(0,1,0), yaw)));
-      camera.lookAt(cat.position);
+      camera.position.copy(body.position.clone().add(new THREE.Vector3(0, 5, 8).applyAxisAngle(new THREE.Vector3(0,1,0), yaw)));
+      camera.lookAt(body.position);
 
       foodItems.forEach((f, i) => {
-        if (cat.position.distanceTo(f.position) < 1 + weight * 0.05) {
+        if (body.position.distanceTo(f.position) < 1 + weight * 0.05) {
           scene.remove(f);
           foodItems.splice(i, 1);
           const gain = f.userData.weight * (100 / weight);
           weight += gain;
-          cat.scale.set(weight * 0.1, weight * 0.1, weight * 0.1);
+          body.scale.set(weight * 0.1, weight * 0.1, weight * 0.1);
           spawnFood();
         }
       });
 
-      const screenPos = cat.position.clone().project(camera);
+      cars.forEach(car => {
+        car.position.x += car.userData.speed;
+        if (car.position.x > 160) car.position.x = -160;
+
+        if (car.position.distanceTo(body.position) < 2) {
+          hp -= 40;
+          hp = Math.max(0, hp);
+          car.position.x = -160; // reset car position
+        }
+      });
+
+      const screenPos = body.position.clone().project(camera);
       nameTag.innerText = `${weight.toFixed(2)} lbs`;
       nameTag.style.left = ((screenPos.x + 1) / 2 * window.innerWidth - 20) + 'px';
       nameTag.style.top = ((-screenPos.y + 1) / 2 * window.innerHeight - 40) + 'px';
