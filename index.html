@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Nuchistrike</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #222; }
+    body { margin: 0; overflow: hidden; background: #000; }
     #info {
       position: absolute;
       top: 10px;
       left: 10px;
       color: white;
-      background: rgba(0,0,0,0.6);
+      background: rgba(0, 0, 0, 0.6);
       padding: 10px;
       font-family: sans-serif;
       z-index: 1;
@@ -27,69 +27,81 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Lighting
+    scene.background = new THREE.Color(0x1c1c1c);
+
     const light = new THREE.DirectionalLight(0xffffff, 1);
     light.position.set(10, 10, 10);
     scene.add(light);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.3));
 
-    // Ground
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(100, 100),
-      new THREE.MeshStandardMaterial({ color: 0x999999 })
+      new THREE.PlaneGeometry(200, 200),
+      new THREE.MeshStandardMaterial({ color: 0x777777 })
     );
     ground.rotation.x = -Math.PI / 2;
     scene.add(ground);
 
-    // Nucci Cat
-    const cat = new THREE.Mesh(
-      new THREE.SphereGeometry(0.5, 32, 32),
-      new THREE.MeshStandardMaterial({ color: 0xcc8844 })
-    );
-    cat.position.y = 0.5;
+    const catGeo = new THREE.SphereGeometry(1, 32, 32);
+    const catMat = new THREE.MeshStandardMaterial({ color: 0xffcc99 });
+    const cat = new THREE.Mesh(catGeo, catMat);
+    cat.position.y = 1;
     scene.add(cat);
-
-    camera.position.set(0, 5, 10);
-    camera.lookAt(cat.position);
 
     let foodItems = [];
     let weight = 1;
     let hp = 100;
     const info = document.getElementById('info');
 
-    function spawnFood() {
-      const food = new THREE.Mesh(
-        new THREE.BoxGeometry(0.3, 0.3, 0.3),
-        new THREE.MeshStandardMaterial({ color: 0xff5500 })
-      );
-      food.position.set((Math.random() - 0.5) * 40, 0.15, (Math.random() - 0.5) * 40);
-      scene.add(food);
-      foodItems.push(food);
+    const buildingGeo = new THREE.BoxGeometry(10, 20, 10);
+    for (let i = 0; i < 10; i++) {
+      const bMat = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff });
+      const b = new THREE.Mesh(buildingGeo, bMat);
+      b.position.set((Math.random() - 0.5) * 180, 10, (Math.random() - 0.5) * 180);
+      scene.add(b);
     }
 
-    for (let i = 0; i < 10; i++) spawnFood();
+    function spawnFood() {
+      const f = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.5, 0.5),
+        new THREE.MeshStandardMaterial({ color: 0xff5500 })
+      );
+      f.position.set((Math.random() - 0.5) * 180, 0.25, (Math.random() - 0.5) * 180);
+      scene.add(f);
+      foodItems.push(f);
+    }
+    for (let i = 0; i < 20; i++) spawnFood();
 
-    document.addEventListener('keydown', (e) => {
-      let move = e.shiftKey ? 0.2 : 0.1;
-      if (e.key === 'w') cat.position.z -= move;
-      if (e.key === 's') cat.position.z += move;
-      if (e.key === 'a') cat.position.x -= move;
-      if (e.key === 'd') cat.position.x += move;
-    });
+    const keys = { w: false, a: false, s: false, d: false };
+    document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+    document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+    camera.position.set(0, 10, 15);
+    camera.lookAt(cat.position);
 
     function animate() {
       requestAnimationFrame(animate);
-      foodItems.forEach((food, i) => {
-        if (cat.position.distanceTo(food.position) < 0.5 + weight * 0.05) {
-          scene.remove(food);
+
+      const moveSpeed = 0.2;
+      if (keys.w) cat.position.z -= moveSpeed;
+      if (keys.s) cat.position.z += moveSpeed;
+      if (keys.a) cat.position.x -= moveSpeed;
+      if (keys.d) cat.position.x += moveSpeed;
+
+      camera.position.x = cat.position.x;
+      camera.position.z = cat.position.z + 15;
+      camera.lookAt(cat.position);
+
+      foodItems.forEach((f, i) => {
+        if (cat.position.distanceTo(f.position) < 1 + weight * 0.05) {
+          scene.remove(f);
           foodItems.splice(i, 1);
           weight++;
-          cat.scale.set(weight * 0.05, weight * 0.05, weight * 0.05);
+          cat.scale.set(weight * 0.1, weight * 0.1, weight * 0.1);
           info.textContent = `Weight: ${weight} lbs | HP: ${hp}%`;
           spawnFood();
         }
       });
-      camera.lookAt(cat.position);
+
       renderer.render(scene, camera);
     }
     animate();
