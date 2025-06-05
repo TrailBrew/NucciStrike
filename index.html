@@ -1,1 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nuchistrike</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
+      border-radius: 8px;
+      font-family: sans-serif;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">Loading Nuchistrike...</div>
+  <script type="module">
+    import * as THREE from 'https://cdn.skypack.dev/three@0.152.2';
+    import { OrbitControls } from 'https://cdn.skypack.dev/three/examples/jsm/controls/OrbitControls';
+
+    let scene, camera, renderer, cat, controls, foodItems = [], speed = 0.1, weight = 1, hp = 100;
+
+    const info = document.getElementById('info');
+
+    init();
+    animate();
+
+    function init() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xaec6cf);
+
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 5, 10);
+
+      renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      controls = new OrbitControls(camera, renderer.domElement);
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(10, 10, 10);
+      scene.add(directionalLight);
+
+      const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(100, 100),
+        new THREE.MeshStandardMaterial({ color: 0xdddddd })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      scene.add(ground);
+
+      const catGeo = new THREE.SphereGeometry(0.5, 32, 32);
+      const catMat = new THREE.MeshStandardMaterial({ color: 0xcc8844 });
+      cat = new THREE.Mesh(catGeo, catMat);
+      cat.position.y = 0.5;
+      scene.add(cat);
+
+      for (let i = 0; i < 10; i++) spawnFood();
+
+      window.addEventListener('resize', onWindowResize);
+      document.addEventListener('keydown', handleKey);
+    }
+
+    function spawnFood() {
+      const foodGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+      const foodMat = new THREE.MeshStandardMaterial({ color: 0xff5500 });
+      const food = new THREE.Mesh(foodGeo, foodMat);
+      food.position.set(
+        (Math.random() - 0.5) * 40,
+        0.15,
+        (Math.random() - 0.5) * 40
+      );
+      scene.add(food);
+      foodItems.push(food);
+    }
+
+    function handleKey(e) {
+      const key = e.key.toLowerCase();
+      const shift = e.shiftKey;
+      let moveSpeed = shift ? speed * 2 : speed;
+      if (key === 'w') cat.position.z -= moveSpeed;
+      if (key === 's') cat.position.z += moveSpeed;
+      if (key === 'a') cat.position.x -= moveSpeed;
+      if (key === 'd') cat.position.x += moveSpeed;
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      foodItems.forEach((food, i) => {
+        if (cat.position.distanceTo(food.position) < 0.5 + weight * 0.05) {
+          scene.remove(food);
+          foodItems.splice(i, 1);
+          weight += 1;
+          cat.scale.set(weight * 0.05, weight * 0.05, weight * 0.05);
+          info.innerText = `Weight: ${weight} lbs\nHP: ${hp}%`;
+          spawnFood();
+        }
+      });
+
+      camera.lookAt(cat.position);
+      renderer.render(scene, camera);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+  </script>
+</body>
+</html>
 
