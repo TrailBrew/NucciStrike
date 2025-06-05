@@ -15,10 +15,11 @@
       font-family: sans-serif;
       z-index: 1;
     }
+    canvas { display: block; cursor: none; }
   </style>
 </head>
 <body>
-  <div id="info">Weight: 1 lb | HP: 100%</div>
+  <div id="info">Weight: 1.00 lbs | HP: 100%</div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
   <script>
     let scene = new THREE.Scene();
@@ -27,80 +28,113 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    scene.background = new THREE.Color(0x1c1c1c);
-
     const light = new THREE.DirectionalLight(0xffffff, 1);
     light.position.set(10, 10, 10);
     scene.add(light);
     scene.add(new THREE.AmbientLight(0xffffff, 0.3));
 
+    scene.background = new THREE.Color(0x1c1c1c);
+
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(200, 200),
-      new THREE.MeshStandardMaterial({ color: 0x777777 })
+      new THREE.MeshStandardMaterial({ color: 0x666666 })
     );
     ground.rotation.x = -Math.PI / 2;
     scene.add(ground);
 
-    const catGeo = new THREE.SphereGeometry(1, 32, 32);
-    const catMat = new THREE.MeshStandardMaterial({ color: 0xffcc99 });
-    const cat = new THREE.Mesh(catGeo, catMat);
+    const cat = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 32, 32),
+      new THREE.MeshStandardMaterial({ color: 0xffcc99 })
+    );
     cat.position.y = 1;
     scene.add(cat);
 
-    let foodItems = [];
-    let weight = 1;
+    const info = document.getElementById("info");
+    let weight = 1.0;
     let hp = 100;
-    const info = document.getElementById('info');
+    const foodItems = [];
 
-    const buildingGeo = new THREE.BoxGeometry(10, 20, 10);
-    for (let i = 0; i < 10; i++) {
-      const bMat = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff });
-      const b = new THREE.Mesh(buildingGeo, bMat);
-      b.position.set((Math.random() - 0.5) * 180, 10, (Math.random() - 0.5) * 180);
-      scene.add(b);
-    }
-
+    // Simulated food: different shapes & weights
     function spawnFood() {
-      const f = new THREE.Mesh(
-        new THREE.BoxGeometry(0.5, 0.5, 0.5),
-        new THREE.MeshStandardMaterial({ color: 0xff5500 })
-      );
-      f.position.set((Math.random() - 0.5) * 180, 0.25, (Math.random() - 0.5) * 180);
-      scene.add(f);
-      foodItems.push(f);
+      const types = [
+        { geometry: new THREE.SphereGeometry(0.2), weight: 0.1, color: 0x996633 }, // Kibble
+        { geometry: new THREE.BoxGeometry(0.3, 0.3, 0.3), weight: 0.25, color: 0xdddddd }, // Tuna can
+        { geometry: new THREE.BoxGeometry(0.4, 0.2, 0.6), weight: 0.5, color: 0x3366ff }  // Fish bag
+      ];
+      const type = types[Math.floor(Math.random() * types.length)];
+      const mat = new THREE.MeshStandardMaterial({ color: type.color });
+      const food = new THREE.Mesh(type.geometry, mat);
+      food.userData.weight = type.weight;
+      food.position.set((Math.random() - 0.5) * 180, 0.15, (Math.random() - 0.5) * 180);
+      scene.add(food);
+      foodItems.push(food);
     }
-    for (let i = 0; i < 20; i++) spawnFood();
+    for (let i = 0; i < 30; i++) spawnFood();
 
-    const keys = { w: false, a: false, s: false, d: false };
-    document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
-    document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+    // Pointer lock for camera control
+    let isPointerLocked = false;
+    document.body.addEventListener("click", () => {
+      if (!isPointerLocked) {
+        renderer.domElement.requestPointerLock();
+      }
+    });
+    document.addEventListener("pointerlockchange", () => {
+      isPointerLocked = document.pointerLockElement === renderer.domElement;
+    });
 
-    camera.position.set(0, 10, 15);
-    camera.lookAt(cat.position);
+    let move = { forward: false, backward: false, left: false, right: false, shift: false };
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "w") move.forward = true;
+      if (e.key === "s") move.backward = true;
+      if (e.key === "a") move.left = true;
+      if (e.key === "d") move.right = true;
+      if (e.key === "Shift") move.shift = true;
+    });
+    document.addEventListener("keyup", (e) => {
+      if (e.key === "w") move.forward = false;
+      if (e.key === "s") move.backward = false;
+      if (e.key === "a") move.left = false;
+      if (e.key === "d") move.right = false;
+      if (e.key === "Shift") move.shift = false;
+    });
+
+    let yaw = 0;
+    document.addEventListener("mousemove", (e) => {
+      if (isPointerLocked) yaw -= e.movementX * 0.002;
+    });
 
     function animate() {
       requestAnimationFrame(animate);
 
-      const moveSpeed = 0.2;
-      if (keys.w) cat.position.z -= moveSpeed;
-      if (keys.s) cat.position.z += moveSpeed;
-      if (keys.a) cat.position.x -= moveSpeed;
-      if (keys.d) cat.position.x += moveSpeed;
+      let moveSpeed = move.shift ? 0.25 : 0.15;
+      moveSpeed -= weight * 0.0025;
+      moveSpeed = Math.max(0.05, moveSpeed);
 
-      camera.position.x = cat.position.x;
-      camera.position.z = cat.position.z + 15;
+      const dir = new THREE.Vector3();
+      dir.set(Math.sin(yaw), 0, Math.cos(yaw));
+
+      if (move.forward) cat.position.add(dir.clone().multiplyScalar(moveSpeed));
+      if (move.backward) cat.position.add(dir.clone().multiplyScalar(-moveSpeed));
+
+      const sideDir = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), dir);
+      if (move.left) cat.position.add(sideDir.clone().multiplyScalar(moveSpeed));
+      if (move.right) cat.position.add(sideDir.clone().multiplyScalar(-moveSpeed));
+
+      camera.position.copy(cat.position.clone().add(new THREE.Vector3(0, 5, 8).applyAxisAngle(new THREE.Vector3(0,1,0), yaw)));
       camera.lookAt(cat.position);
 
-      foodItems.forEach((f, i) => {
+      for (let i = foodItems.length - 1; i >= 0; i--) {
+        const f = foodItems[i];
         if (cat.position.distanceTo(f.position) < 1 + weight * 0.05) {
           scene.remove(f);
           foodItems.splice(i, 1);
-          weight++;
+          const gain = f.userData.weight * (100 / weight);
+          weight += gain;
           cat.scale.set(weight * 0.1, weight * 0.1, weight * 0.1);
-          info.textContent = `Weight: ${weight} lbs | HP: ${hp}%`;
+          info.textContent = `Weight: ${weight.toFixed(2)} lbs | HP: ${hp}%`;
           spawnFood();
         }
-      });
+      }
 
       renderer.render(scene, camera);
     }
